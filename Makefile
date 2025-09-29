@@ -2,6 +2,8 @@
 # DOMjudge Docker Deployment
 # ===========================
 
+.DEFAULT_GOAL := help
+
 ENV ?= dev
 ENV_FILE := .env.$(ENV)
 
@@ -13,15 +15,23 @@ endif
 
 DC := docker compose
 
+# Warn if env file missing (except for help/init targets)
 ifeq (,$(wildcard $(ENV_FILE)))
-$(error Environment file '$(ENV_FILE)' not found!)
+ifneq ($(MAKECMDGOALS),help)
+ifneq ($(MAKECMDGOALS),init-dev)
+ifneq ($(MAKECMDGOALS),init-prod)
+$(warning ⚠️  Environment file '$(ENV_FILE)' not found. Run 'make init-$(ENV)' first.)
+endif
+endif
+endif
 endif
 
-.PHONY: setup lifecycle debug scaling misc help
+.PHONY: setup lifecycle debug scaling help init-dev init-prod
 
 # ===========================
 # Setup
 # ===========================
+
 init-dev:
 	@test -f .env.dev || cp .env.dev.example .env.dev
 	@echo "✅ .env.dev created from template"
@@ -93,6 +103,8 @@ help:
 	@echo "📖 Available targets:"
 	@echo ""
 	@echo "Setup:"
+	@echo "  init-dev                - Create .env.dev from template"
+	@echo "  init-prod               - Create .env.prod from template"
 	@echo "  setup-host              - Verify & install host prerequisites"
 	@echo "  hash-password           - Generate TRAEFIK_HASHED_PASSWORD from plaintext"
 	@echo "  extract-judgehost-password - Extract JUDGEHOST_PASSWORD from domserver logs"
