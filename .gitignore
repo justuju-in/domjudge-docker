@@ -7,3 +7,6 @@ test.yml
 
 # Explicitly ignore production env
 .env.prod
+.env.dev
+
+!.env.*.example

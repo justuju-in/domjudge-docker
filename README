@@ -2,60 +2,159 @@
 
 This project provides a complete Docker-based setup for DOMjudge, including MariaDB, Redis, Traefik, and Portainer.
 
-## Deployment Flow
-Before starting Docker services on some Linux hosts you may need to enable memory accounting for cgroups. A helper script is provided:
+---
+
+## 🚀 First-Time Setup
 
 ```bash
-sudo ./scripts/fix_cgroup.sh        # updates /etc/default/grub (backup created) and runs update-grub
-sudo ./scripts/fix_cgroup.sh --reboot  # apply and reboot immediately
+git clone <repo-url>
+cd domjudge-docker
+make bootstrap ENV=dev     # for local development
+make bootstrap ENV=prod    # for production
 ```
 
-1. **Configure Environment**
-	- Edit `.env.dev` (for development) or `.env.prod` (for production) with your settings.
+The `bootstrap` command will:
 
-2. **Start All Services**
-	- Generate the hashed Traefik password (reads TRAEFIK_PLAINTEXT_PASSWORD in your .env):
-	  - `./scripts/hash_traefik_password.sh dev` or `./scripts/hash_traefik_password.sh prod`
-	  - Or use Make: `make hash-password ENV=prod` (calls the same script)
-	- Development: `make up`
-	- Production: `make up ENV=prod`
+* Create `.env.dev` or `.env.prod` from the template if missing
+* Generate the hashed Traefik password
+* Verify and install host prerequisites
+* Start all containers
 
-3. **Extract Judgehost Password**
-	- After starting, run: `make extract-password` (or `make extract-password ENV=prod`)
-	- This updates your `.env` file with the correct `JUDGEHOST_PASSWORD`.
+---
 
-4. **Restart Judgehost**
-	- `make restart`
+## ⚙️ Deployment Flow
 
-5. **Access Services**
-	- Contest: https://contest.yourdomain.com
-	- Traefik: https://traefik.yourdomain.com
-	- Redis Insight: http://server_ip:5540
+1. **Enable cgroups (if required)**
+   Some Linux hosts need memory cgroup accounting:
 
-## Customization
+   ```bash
+   sudo ./scripts/fix_cgroup.sh          # update grub config
+   sudo ./scripts/fix_cgroup.sh --reboot # apply and reboot immediately
+   ```
 
-- Edit templates in `template-overrides/` as needed.
-- Restart domserver after template changes: `make restart`
+2. **Extract Judgehost Password**
+   After the first run, update your `.env` with the correct judgehost password:
 
-## Useful Makefile Commands
+   ```bash
+   make extract-judgehost-password ENV=dev
+   ```
 
-- `make up` / `make down` — Start/stop all services
-- `make logs` — View logs
-- `make ps` — List containers
-- `make env` — Show current environment variables
-- `make extract-password` — Update judgehost password in `.env`
+3. **Restart Judgehost**
 
-## Troubleshooting
+   ```bash
+   make restart ENV=dev
+   ```
 
-- **SSL Issues**: Check DNS, ports 80/443, and Traefik logs
-- **Judgehost Issues**: Ensure `DOMSERVER_MAIN_IP` and password are correct
-- **Database Issues**: Check credentials in `.env` files
+4. **Access Services**
 
-## Helper scripts
+   * DOMjudge Contest: [https://contest.yourdomain.com](https://contest.yourdomain.com)
+   * Traefik Dashboard: [https://traefik.yourdomain.com](https://traefik.yourdomain.com)
+   * Redis Insight: http://server_ip:5540
 
-- `scripts/fix_cgroup.sh` — Adds kernel boot flags required by Docker on some hosts (creates a backup of `/etc/default/grub`). Requires sudo. See above for usage.
-- `scripts/hash_traefik_password.sh` — Reads `TRAEFIK_PLAINTEXT_PASSWORD` from `.env.dev` or `.env.prod`, generates an APR1 hash with `openssl`, and writes `TRAEFIK_HASHED_PASSWORD='...'` into the file.
+---
 
+## 📝 Environment Templates
 
-For more, see the Makefile and scripts in the `scripts/` directory.
+### `.env.dev.example`
+
+```env
+# DOMjudge Dev Environment
+
+TRAEFIK_PLAINTEXT_PASSWORD=changeme
+TRAEFIK_HASHED_PASSWORD=$apr1$dummy$hash
+TRAEFIK_DOMAIN=traefik.localhost
+
+SITES=domjudge.localhost
+EMAIL=dev@example.com
+
+MYSQL_ROOT_PASSWORD=root
+MYSQL_DATABASE=domjudge
+MYSQL_USER=domjudge
+MYSQL_PASSWORD=domjudge
+
+TZ=UTC
+```
+
+### `.env.prod.example`
+
+```env
+# DOMjudge Production Environment
+
+TRAEFIK_PLAINTEXT_PASSWORD=changeme
+TRAEFIK_HASHED_PASSWORD=$apr1$dummy$hash
+TRAEFIK_DOMAIN=traefik.example.com
+
+SITES=domjudge.example.com
+EMAIL=admin@example.com
+
+MYSQL_ROOT_PASSWORD=SuperSecretRootPass
+MYSQL_DATABASE=domjudge
+MYSQL_USER=domjudge
+MYSQL_PASSWORD=SuperSecretUserPass
+
+TZ=UTC
+```
+
+👉 Copy these templates to `.env.dev` or `.env.prod` and adjust values as needed.
+👉 For production, **always replace** passwords and domains with secure values.
+
+---
+
+## 📖 Useful Makefile Commands
+
+### Setup
+
+* `make init-dev` / `make init-prod` — Create `.env` from template
+* `make hash-password ENV=prod` — Generate Traefik hashed password
+* `make extract-judgehost-password ENV=prod` — Extract judgehost password
+
+### Lifecycle
+
+* `make up ENV=prod` — Start services
+* `make down ENV=prod` — Stop services
+* `make restart ENV=prod` — Restart services
+
+### Debugging
+
+* `make logs ENV=dev` — View logs
+* `make ps ENV=dev` — List containers
+* `make env ENV=dev` — Show active environment file
+
+### Scaling
+
+* `make scale ENV=prod N=3` — Scale judgehost replicas
+
+### Bootstrap
+
+* `make bootstrap ENV=dev` — One-step init + hash-password + host check + up
+
+---
+
+## 🛠️ Troubleshooting
+
+* **SSL Issues**: Check DNS, ports 80/443, and Traefik logs.
+* **Judgehost Issues**: Ensure `JUDGEHOST_PASSWORD` in `.env` matches the domserver logs.
+* **Database Issues**: Verify credentials in `.env.dev` / `.env.prod`.
+
+---
+
+## 📂 Helper Scripts
+
+* `scripts/fix_cgroup.sh` — Adds kernel boot flags for Docker (backup of `/etc/default/grub` created).
+* `scripts/hash_traefik_password.sh` — Generates and escapes Traefik APR1 hash.
+* `scripts/extract_judgehost_password.sh` — Reads judgehost password from domserver logs and updates `.env`.
+* `scripts/domjudge_host_setup.sh` — Verifies and installs host prerequisites (Docker, Compose, CLI tools).
+
+---
+
+## 🔎 Workflow Overview
+
+```text
+make bootstrap ENV=dev
+      │
+      ├──► init-dev/init-prod   (create .env.* from template)
+      ├──► hash-password        (generate Traefik hash)
+      ├──► setup-host           (verify prerequisites)
+      └──► up                   (start containers)
+```
 
