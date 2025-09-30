@@ -118,6 +118,11 @@ check_privileges() {
         ok "User is in docker group"
     else
         warn "Not root and not in docker group – may need sudo for Docker"
+        if $FIX; then
+            info "Adding $USER to docker group..."
+            sudo usermod -aG docker "$USER"
+            ok "$USER added to docker group. Please log out and log back in for this to take effect."
+        fi
     fi
 }
 
