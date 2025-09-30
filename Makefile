@@ -26,7 +26,18 @@ endif
 endif
 endif
 
-.PHONY: setup lifecycle debug scaling help init-dev init-prod
+.PHONY: setup lifecycle debug scaling help init-dev init-prod bootstrap
+# ===========================
+# Bootstrap
+# ===========================
+
+bootstrap:
+	@if [ ! -f $(ENV_FILE) ]; then \
+	  echo "Creating $(ENV_FILE) from template..."; \
+	  make init-$(ENV); \
+	fi
+	make setup-host ENV=$(ENV)
+	make up ENV=$(ENV)
 
 # ===========================
 # Setup
