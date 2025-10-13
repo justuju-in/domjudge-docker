@@ -17,14 +17,20 @@ if [ -z "$PLAINTEXT" ]; then
   exit 1
 fi
 
-# Generate hash and escape `$` for Docker Compose
-HASHED=$(openssl passwd -apr1 "$PLAINTEXT" | sed 's/\$/$$/g')
+# Generate hash
+HASHED_RAW=$(openssl passwd -apr1 "$PLAINTEXT")
 
-if grep -q '^TRAEFIK_HASHED_PASSWORD=' "$ENV_FILE"; then
-  sed -i "s/^TRAEFIK_HASHED_PASSWORD=.*/TRAEFIK_HASHED_PASSWORD=$HASHED/" "$ENV_FILE"
-else
-  echo "TRAEFIK_HASHED_PASSWORD=$HASHED" >> "$ENV_FILE"
-fi
+# Escape dollar signs by doubling them so Docker Compose won't try to expand $apr1 etc.
+HASHED_ESCAPED=$(printf '%s' "$HASHED_RAW" | sed 's/\$/\$\$/g')
+
+# Safely replace or append the TRAEFIK_HASHED_PASSWORD line using awk (handles arbitrary characters)
+tmpfile=$(mktemp)
+awk -v val="$HASHED_ESCAPED" '
+  BEGIN { found=0 }
+  /^TRAEFIK_HASHED_PASSWORD=/ { print "TRAEFIK_HASHED_PASSWORD=" val; found=1; next }
+  { print }
+  END { if (!found) print "TRAEFIK_HASHED_PASSWORD=" val }
+' "$ENV_FILE" > "$tmpfile" && mv "$tmpfile" "$ENV_FILE"
 
 echo "✅ Updated TRAEFIK_HASHED_PASSWORD in $ENV_FILE"
 echo "   Hashed password (escaped): $HASHED"
