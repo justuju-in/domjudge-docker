@@ -1,94 +1,160 @@
-# DOMjudge Docker Setup
+# DOMjudge Docker Quick Start
 
-Complete Docker setup for DOMjudge with Redis, Traefik, and custom templates.
+This project provides a complete Docker-based setup for DOMjudge, including MariaDB, Redis, Traefik, and Portainer.
 
-## Components
-- **DOMjudge**: Contest platform with custom templates
-- **MariaDB**: Database
-- **Redis**: Cache & sessions  
-- **Traefik**: Reverse proxy with SSL
-- **Portainer**: Container management
+---
 
-## Quick Deploy
-
-### 1. Traefik & SSL
-```bash
-export EMAIL=your-email@example.com
-export TRAEFIK_DOMAIN=traefik.yourdomain.com
-export HASHED_PASSWORD=$(openssl passwd -apr1)
-echo $HASHED_PASSWORD > traefik_pass.txt
-docker compose -f traefik.yml up -d
-```
-
-### 2. Database & Redis
-```bash
-export DJ_DB=domjudge DJ_DB_USER=domjudge
-export DJ_DB_PASSWORD=secure_password
-export DB_ROOT_PASSWORD=root_password
-docker compose -f mariadb.yml up -d
-docker compose -f redis.yml up -d
-```
-
-### 3. Portainer (Optional)
-```bash
-export PORTAINER_DOMAIN=portainer.yourdomain.com
-docker compose -f portainer.yml up -d
-```
-
-### 4. DOMjudge Server
-```bash
-export SITES=contest.yourdomain.com
-docker compose -f domserver.yml up -d
-
-# Get passwords from logs
-docker compose -f domserver.yml logs domserver | grep -E "(admin|judgehost)"
-```
-
-### 5. Judgehosts
-```bash
-export DOMSERVER_MAIN_IP=your_server_ip
-export JUDGEHOST_PASSWORD=password_from_logs
-docker compose -f judgehost.yml up -d
-```
-
-## Access URLs
-- **Contest**: https://contest.yourdomain.com
-- **Traefik**: https://traefik.yourdomain.com  
-- **Portainer**: https://portainer.yourdomain.com
-- **Redis Insight**: http://server_ip:5540
-
-## Custom Templates
-Edit templates in `template-overrides/`:
-- `base.html.twig` - Team interface base
-- `submit_scripts.html.twig` - Submission scripts
-
-Restart domserver after changes: `docker compose -f domserver.yml restart`
-
-## Useful Commands
+## 🚀 First-Time Setup
 
 ```bash
-# View logs
-docker compose -f domserver.yml logs -f
-
-# Restart services  
-docker compose -f domserver.yml restart
-
-# Database backup
-docker exec mariadb mysqldump -u root -p$DB_ROOT_PASSWORD $DJ_DB > backup.sql
-
-# Stop all
-docker compose -f traefik.yml down
-docker compose -f domserver.yml down  
-docker compose -f judgehost.yml down
-docker compose -f redis.yml down
-docker compose -f mariadb.yml down
+git clone <repo-url>
+cd domjudge-docker
+make bootstrap ENV=dev     # for local development
+make bootstrap ENV=prod    # for production
 ```
 
-## Troubleshooting
+The `bootstrap` command will:
 
-**SSL Issues**: Check DNS, ports 80/443 open, view Traefik logs
-**Judgehost Issues**: Verify DOMSERVER_MAIN_IP and password  
-**Database Issues**: Check credentials match across services
+* Create `.env.dev` or `.env.prod` from the template if missing
+* Generate the hashed Traefik password
+* Verify and install host prerequisites
+* Start all containers
 
-**Debug**: `docker compose -f [service].yml logs --tail=50`
+---
+
+## ⚙️ Deployment Flow
+
+1. **Enable cgroups (if required)**
+   Some Linux hosts need memory cgroup accounting:
+
+   ```bash
+   sudo ./scripts/fix_cgroup.sh          # update grub config
+   sudo ./scripts/fix_cgroup.sh --reboot # apply and reboot immediately
+   ```
+
+2. **Extract Judgehost Password**
+   After the first run, update your `.env` with the correct judgehost password:
+
+   ```bash
+   make extract-judgehost-password ENV=dev
+   ```
+
+3. **Restart Judgehost**
+
+   ```bash
+   make restart ENV=dev
+   ```
+
+4. **Access Services**
+
+   * DOMjudge Contest: [https://contest.yourdomain.com](https://contest.yourdomain.com)
+   * Traefik Dashboard: [https://traefik.yourdomain.com](https://traefik.yourdomain.com)
+   * Redis Insight: http://server_ip:5540
+
+---
+
+## 📝 Environment Templates
+
+### `.env.dev.example`
+
+```env
+# DOMjudge Dev Environment
+
+TRAEFIK_PLAINTEXT_PASSWORD=changeme
+TRAEFIK_HASHED_PASSWORD=$apr1$dummy$hash
+TRAEFIK_DOMAIN=traefik.localhost
+
+SITES=domjudge.localhost
+EMAIL=dev@example.com
+
+MYSQL_ROOT_PASSWORD=root
+MYSQL_DATABASE=domjudge
+MYSQL_USER=domjudge
+MYSQL_PASSWORD=domjudge
+
+TZ=UTC
+```
+
+### `.env.prod.example`
+
+```env
+# DOMjudge Production Environment
+
+TRAEFIK_PLAINTEXT_PASSWORD=changeme
+TRAEFIK_HASHED_PASSWORD=$apr1$dummy$hash
+TRAEFIK_DOMAIN=traefik.example.com
+
+SITES=domjudge.example.com
+EMAIL=admin@example.com
+
+MYSQL_ROOT_PASSWORD=SuperSecretRootPass
+MYSQL_DATABASE=domjudge
+MYSQL_USER=domjudge
+MYSQL_PASSWORD=SuperSecretUserPass
+
+TZ=UTC
+```
+
+👉 Copy these templates to `.env.dev` or `.env.prod` and adjust values as needed.
+👉 For production, **always replace** passwords and domains with secure values.
+
+---
+
+## 📖 Useful Makefile Commands
+
+### Setup
+
+* `make init-dev` / `make init-prod` — Create `.env` from template
+* `make hash-password ENV=prod` — Generate Traefik hashed password
+* `make extract-judgehost-password ENV=prod` — Extract judgehost password
+
+### Lifecycle
+
+* `make up ENV=prod` — Start services
+* `make down ENV=prod` — Stop services
+* `make restart ENV=prod` — Restart services
+
+### Debugging
+
+* `make logs ENV=dev` — View logs
+* `make ps ENV=dev` — List containers
+* `make env ENV=dev` — Show active environment file
+
+### Scaling
+
+* `make scale ENV=prod N=3` — Scale judgehost replicas
+
+### Bootstrap
+
+* `make bootstrap ENV=dev` — One-step init + hash-password + host check + up
+
+---
+
+## 🛠️ Troubleshooting
+
+* **SSL Issues**: Check DNS, ports 80/443, and Traefik logs.
+* **Judgehost Issues**: Ensure `JUDGEHOST_PASSWORD` in `.env` matches the domserver logs.
+* **Database Issues**: Verify credentials in `.env.dev` / `.env.prod`.
+
+---
+
+## 📂 Helper Scripts
+
+* `scripts/fix_cgroup.sh` — Adds kernel boot flags for Docker (backup of `/etc/default/grub` created).
+* `scripts/hash_traefik_password.sh` — Generates and escapes Traefik APR1 hash.
+* `scripts/extract_judgehost_password.sh` — Reads judgehost password from domserver logs and updates `.env`.
+* `scripts/domjudge_host_setup.sh` — Verifies and installs host prerequisites (Docker, Compose, CLI tools).
+
+---
+
+## 🔎 Workflow Overview
+
+```text
+make bootstrap ENV=dev
+      │
+      ├──► init-dev/init-prod   (create .env.* from template)
+      ├──► hash-password        (generate Traefik hash)
+      ├──► setup-host           (verify prerequisites)
+      └──► up                   (start containers)
+```
 

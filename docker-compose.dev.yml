@@ -1,0 +1,129 @@
+services:
+  traefik:
+    image: traefik:${TRAEFIK_VERSION:-v2.9}
+    container_name: traefik
+    ports:
+      - "80:80"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command:
+      - --providers.docker
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.http.address=:80
+    networks:
+      - traefik-public
+
+  db:
+    image: mariadb:${MARIADB_VERSION}
+    container_name: mariadb
+    environment:
+      MYSQL_DATABASE: ${DJ_DB}
+      MYSQL_USER: ${DJ_DB_USER}
+      MYSQL_PASSWORD: ${DJ_DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      CONTAINER_TIMEZONE: ${CONTAINER_TIMEZONE}
+    volumes:
+      - db-data:/var/lib/mysql
+      - ../init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./mariadb.cnf:/etc/mysql/conf.d/custom.cnf:ro
+    networks:
+      - mariadb-network
+
+  redis:
+    image: redis:${REDIS_VERSION}
+    container_name: ${REDIS_CONTAINER_NAME}
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - web-network
+
+  redisinsight:
+    image: redislabs/redisinsight:${REDIS_INSIGHT_VERSION}
+    container_name: ${REDIS_INSIGHT_CONTAINER_NAME}
+    ports:
+      - 5540:5540
+    environment:
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+    networks:
+      - web-network
+
+  domserver:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: domserver
+    restart: always
+    privileged: true
+    volumes:
+      - submissions-data:/opt/domjudge/domserver/submissions/
+      - judgings-data:/opt/domjudge/domserver/judgings/
+      - ./services/redis/php.ini:/usr/local/etc/php/php.ini
+      - ./services/redis/framework.yaml:/opt/domjudge/domserver/webapp/config/packages/framework.yaml
+      - ./services/redis/services.yaml:/opt/domjudge/domserver/webapp/config/services.yaml
+    environment:
+      MYSQL_HOST: ${DJ_DB_HOST}
+      MYSQL_DATABASE: ${DJ_DB}
+      MYSQL_USER: ${DJ_DB_USER}
+      MYSQL_PASSWORD: ${DJ_DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      CONTAINER_TIMEZONE: ${CONTAINER_TIMEZONE}
+      FPM_MAX_CHILDREN: ${FPM_MAX_CHILDREN}
+    networks:
+      - traefik-public
+      - mariadb-network
+      - web-network
+    depends_on:
+      - db
+
+  domserver-judge-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: domserver-judge-1
+    restart: always
+    privileged: true
+    volumes:
+      - submissions-data:/opt/domjudge/domserver/submissions/
+      - judgings-data:/opt/domjudge/domserver/judgings/
+    environment:
+      MYSQL_HOST: ${DJ_DB_HOST}
+      MYSQL_DATABASE: ${DJ_DB}
+      MYSQL_USER: ${DJ_DB_USER}
+      MYSQL_PASSWORD: ${DJ_DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      CONTAINER_TIMEZONE: ${CONTAINER_TIMEZONE}
+    networks:
+      - mariadb-network
+      - web-network
+      - judge-network
+
+  judgehost:
+      image: domjudge/judgehost:${JUDGEHOST_VERSION}
+      restart: always
+      privileged: true
+      hostname: judgehost
+      volumes:
+        - /sys/fs/cgroup:/sys/fs/cgroup
+      environment:
+        # DAEMON_ID will auto-increment when scaling
+        DAEMON_ID: "0"
+        DOMSERVER_BASEURL: http://${DOMSERVER_MAIN_IP}/
+        JUDGEDAEMON_PASSWORD: ${JUDGEHOST_PASSWORD}
+        CONTAINER_TIMEZONE: ${CONTAINER_TIMEZONE}
+      networks:
+        - mariadb-network
+        - web-network
+volumes:
+  db-data:
+  redis-data:
+  submissions-data:
+  judgings-data:
+
+networks:
+  traefik-public:
+  mariadb-network:
+  web-network:
+  judge-network:
