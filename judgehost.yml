@@ -7,6 +7,9 @@ services:
     container_name: judgehost
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup      
+      - ./problem-id/judgedaemon.main.php:/opt/domjudge/judgehost/lib/judge/judgedaemon.main.php
+      - ./problem-id/compile.sh:/opt/domjudge/judgehost/lib/judge/compile.sh
+      - ./problem-id/testcase_run.sh:/opt/domjudge/judgehost/lib/judge/testcase_run.sh
     environment:      
       DAEMON_ID: "1"
       DOMSERVER_BASEURL: http://${DOMSERVER_MAIN_IP}/
@@ -24,6 +27,9 @@ services:
     container_name: judgehost-2
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup      
+      - ./problem-id/judgedaemon.main.php:/opt/domjudge/judgehost/lib/judge/judgedaemon.main.php
+      - ./problem-id/compile.sh:/opt/domjudge/judgehost/lib/judge/compile.sh
+      - ./problem-id/testcase_run.sh:/opt/domjudge/judgehost/lib/judge/testcase_run.sh
     environment:      
       DAEMON_ID: "2"
       DOMSERVER_BASEURL: http://${DOMSERVER_MAIN_IP}/
@@ -41,6 +47,9 @@ services:
     container_name: judgehost-3
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup      
+      - ./problem-id/judgedaemon.main.php:/opt/domjudge/judgehost/lib/judge/judgedaemon.main.php
+      - ./problem-id/compile.sh:/opt/domjudge/judgehost/lib/judge/compile.sh
+      - ./problem-id/testcase_run.sh:/opt/domjudge/judgehost/lib/judge/testcase_run.sh
     environment:      
       DAEMON_ID: "3"
       DOMSERVER_BASEURL: http://${DOMSERVER_MAIN_IP}/

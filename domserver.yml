@@ -17,6 +17,8 @@ services:
       - ./redis/services.yaml:/opt/domjudge/domserver/webapp/config/services.yaml
       - ./template-overrides/base.html.twig:/opt/domjudge/domserver/webapp/templates/team/base.html.twig
       - ./template-overrides/submit_scripts.html.twig:/opt/domjudge/domserver/webapp/templates/team/partials/submit_scripts.html.twig
+      - ./problem-id/JudgeTask.php:/opt/domjudge/domserver/webapp/src/Entity/JudgeTask.php
+      - ./problem-id/JudgehostController.php:/opt/domjudge/domserver/webapp/src/Controller/API/JudgehostController.php
     environment:
       MYSQL_HOST: db
       MYSQL_DATABASE: ${DJ_DB}
